@@ -1,0 +1,93 @@
+---
+title: "The Effect of Transmission Type on Gas Mileage"
+author: "Steve Rowe"
+date: "August 22, 2015"
+output: pdf_document
+---
+
+```{r echo=FALSE, warning=FALSE}
+library(ggplot2)
+library(car)
+```
+#Overview
+This is an attempt to understand the relationship between transmission type (automatic or manual) and gas mileage.  We will be using the mtcars dataset which was extracted from the 1974 Motor Trend US magazine, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973–74 models).  The dataset includes 10 variables in addition to miles per gallon (mpg) so we will have to determine which variables to include in our final model before we can determine the relationship between transmission type and mpg.
+
+#Executive Summary
+Based on this analysis, we can conclude that automatic transmissions are more fuel efficient than manual transmissions.  They cause a car to get a median 2.9 mpg more with the 95% confidence interval being between 0.05 and 5.9 mpg gained.  
+
+#Details
+
+## Exploration
+
+The first thing we should look at is a whether transmissions appear to affect miles per gallon.  See Figure 1a for a plot.  It appears to have an effect.  We can also build a complete linear model.  The results can be seen in Figure 1b.
+
+Looking at the p-values, it is obvious that there are no variables which are signficant.  That means they are all strongly correlated with other variables.  We need a way to reduce the set to only those that are largely independent from each other.
+
+There are several ways to do this.  We will use the Backward Selection process because it produces good results and is straightforward to implement.  Backward Selection is a process whereby we examine a model, remove the variable with the highest p-value, and recompute the new model.  The process ends when there are no variables remaining with p > 0.05.
+
+The least significant variable in our model is cylinders (cyl).  Let's remove that and try again.  The results are in Figure 2.  We can use Anova to determine whether cyl was necessary.
+```{r}
+fit1 <- lm(mpg~., data=mtcars)
+fit2 <- lm(mpg~.-cyl, data=mtcars)
+anova(fit2, fit1)
+```
+The p-value for these models being the same is 0.91.  This indicates cyl was not necessary.
+
+Continuing this process to completion yields the following model.  Full model summary is in Figure 3.
+``` {r}
+fit.final <- lm(mpg~wt+qsec+am, data=mtcars)
+fit.final$coef
+```
+
+From this model we can see that transmission (AM) has an effect.  Holding everything else constant, automatic transmissions get 2.9 mpg more than standard transmissions.  We can calculate a confidence interval for this:
+```{r}
+s <- summary(fit.final)$coef["am",]
+s["Estimate"]+c(-1, 1)*qt(.975, fit.final$df)*s["Std. Error"]
+```
+That is, automatic transmissions may add anywhere from .05 to 5.9 mpg.
+
+## Confirmation
+To determine whether this is a good fitting model, we should do some analysis.  We can start with calculating the Variance Inflation Factor.  That is, how much the variance is increased by the colinearity of our variables.  We use the square root of the VIF because it tells us how much larger the standard error would be.
+```{r}
+sqrt(vif(fit.final))
+```
+The standard error would only be 1.5 times as large which shows we have a good fit.
+
+We can also look at a graph of residuals against quantiles to see if there are any outliers.  See Figure 4.  The quantiles look normal.
+
+#Appendix
+
+### Figure 1a: Plot of MPG as a function of Transmission
+```{r}
+qplot(mtcars$am, mtcars$mpg)
+```
+
+### Figure 1b: Full Model
+
+``` {r}
+summary(lm(mpg~., data=mtcars))$coefficients
+```
+
+### Figure 2: Reduced Model
+``` {r}
+summary(lm(mpg~.-cyl, data=mtcars))$coefficient
+```
+
+### Figure 3: Final Model
+``` {r}
+summary(lm(mpg~wt+qsec+am, data=mtcars))
+```
+
+### Figure 4: QQ Plot
+``` {r}
+qqPlot(fit.final)
+```
+
+### Backward Selection Code
+There is a handy function in R called step which does this backward selection for us.
+``` {r}
+fit <- lm(mpg~., data=mtcars)
+fit.bwd <- step(fit, direction = "backward", trace=FALSE ) 
+fit.bwd$coef
+```
+

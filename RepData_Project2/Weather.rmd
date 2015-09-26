@@ -1,0 +1,128 @@
+---
+title: "Calcualting the Cost of Severe Weather Events"
+author: "Steve Rowe"
+date: "June 20, 2015"
+output: html_document
+---
+
+## Synopsis
+Severe weather events can cost lives and cause economic damage.  The NOAA Storm Data database contains information about
+the damage caused by various types of weather.  Based on analysis of this data, we can determine the type of events causing
+the most damage and those harming the most people.  The analysis in this paper concludes that flooding causes the most economic damage and tornados kill and harm the most people. 
+
+
+
+
+## Data Processing
+Analysis starts with data from the National Weather Service [Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2).  We load the data into R and reduce the data
+set to only those events which cause either economic or population damage.
+
+```{r libraries, message=F}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
+```{r loading, cache=TRUE}
+StormData <- read.csv("C:/Users/strowe/Desktop/jhds/RepData_Project2/repdata-data-StormData.csv", stringsAsFactors = F)
+StormData <- mutate(StormData, CROPDMGEXP = factor(CROPDMGEXP), PROPDMGEXP = factor(PROPDMGEXP))
+```
+
+Once the data is loaded, it must be cleaned up.  The data dates back to 1950 and several terms have been used over time for
+the various events.  The following code removes events which are indeterminate in nature and consolidates others.
+
+```{r cleanup}
+# remove all non-damaging events
+damage <- filter(StormData, FATALITIES != 0 | INJURIES != 0 | PROPDMG != 0 | CROPDMG != 0)
+
+#remove items which are not events or are unidentifiable
+damage <- damage %>% filter(EVTYPE !="?" & EVTYPE !="Other" & EVTYPE !="OTHER" & EVTYPE !="URBAN SMALL" & 
+                            EVTYPE != "APACHE COUNTY" & EVTYPE != "HIGH" & EVTYPE != "TSTMW")
+
+#consolidate events
+damage <- mutate(damage, EVTYPE = ifelse(grepl("winter", EVTYPE, ignore.case=T), "Winter Weather", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("tornado|torndao|funnel|dustnado|dust devil|gustnado", EVTYPE, ignore.case=T), "Tornado", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("blizzard", EVTYPE, ignore.case=T), "Blizzard", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("winter storm|wintry", EVTYPE, ignore.case=T), "Winter Storm", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("thunder", EVTYPE, ignore.case=T), "Thunder Storm", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("wind", EVTYPE, ignore.case=T), "Wind", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("tropical", EVTYPE, ignore.case=T), "Tropical Storm", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("wind", EVTYPE, ignore.case=T), "High Wind", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("flood|high water|fld|rising water", EVTYPE, ignore.case=T), "Flooding", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("high tide|surge|swell|wave|surf", EVTYPE, ignore.case=T), "Storm Surge/Tide", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("snow", EVTYPE, ignore.case=T), "Snow", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("freezing rain", EVTYPE, ignore.case=T), "Freezing Rain", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("rain|precip|burst|shower", EVTYPE, ignore.case=T), "Rain", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("cold|hypothermia|low temp|freeze|exposure", EVTYPE, ignore.case=T), "Cold", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("fire", EVTYPE, ignore.case=T), "Wildfire", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("hail", EVTYPE, ignore.case=T), "Hail", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("heat|warm", EVTYPE, ignore.case=T), "Excessive Heat", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("ice|icy|frost|freezing drizzle|sleet", EVTYPE, ignore.case=T), "Ice", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("landslide|mud|landslump", EVTYPE, ignore.case=T), "Landslide", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("hurricane|typhoon|tsunami", EVTYPE, ignore.case=T), "Hurricane", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("fog", EVTYPE, ignore.case=T), "Fog", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("avalanche|rock slide|avalance", EVTYPE, ignore.case=T), "Avalanche", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("lightning|lighting|ligntning", EVTYPE, ignore.case=T), "Lightning", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("drown|Marine accident|marine mishap|rough seas|heavy seas", EVTYPE, ignore.case=T), "Marine Accident", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("coastal.*storm", EVTYPE, ignore.case=T), "Marine Accident", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("lightning", EVTYPE, ignore.case=T), "Lightning", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("waterspout", EVTYPE, ignore.case=T), "Waterspout", EVTYPE))
+damage <- mutate(damage, EVTYPE = ifelse(grepl("rip", EVTYPE, ignore.case=T), "Rip Current", EVTYPE))
+```
+Next we must adjust the cost figures.  The database stores costs and an exponent which states the denomination of the 
+cost.  For instance, a "B" would mean billions.
+```{r econ}
+# fix economic costs
+damage$CROPDMG[damage$CROPDMGEXP=="B"]<- damage$CROPDMG[damage$CROPDMGEXP=="B"]*1000000000
+damage$CROPDMG[damage$CROPDMGEXP=="m"]<- damage$CROPDMG[damage$CROPDMGEXP=="m"]*1000000
+damage$CROPDMG[damage$CROPDMGEXP=="M"]<- damage$CROPDMG[damage$CROPDMGEXP=="M"]*1000000
+damage$CROPDMG[damage$CROPDMGEXP=="k"]<- damage$CROPDMG[damage$CROPDMGEXP=="k"]*1000
+damage$CROPDMG[damage$CROPDMGEXP=="K"]<- damage$CROPDMG[damage$CROPDMGEXP=="K"]*1000
+damage$CROPDMG[damage$CROPDMGEXP=="h"]<- damage$CROPDMG[damage$CROPDMGEXP=="h"]*100
+damage$CROPDMG[damage$CROPDMGEXP=="H"]<- damage$CROPDMG[damage$CROPDMGEXP=="H"]*100
+
+damage$PROPDMG[damage$PROPDMGEXP=="B"]<- damage$PROPDMG[damage$PROPDMGEXP=="B"]*1000000000
+damage$PROPDMG[damage$PROPDMGEXP=="m"]<- damage$PROPDMG[damage$PROPDMGEXP=="m"]*1000000
+damage$PROPDMG[damage$PROPDMGEXP=="M"]<- damage$PROPDMG[damage$PROPDMGEXP=="M"]*1000000
+damage$PROPDMG[damage$PROPDMGEXP=="k"]<- damage$PROPDMG[damage$PROPDMGEXP=="k"]*1000
+damage$PROPDMG[damage$PROPDMGEXP=="K"]<- damage$PROPDMG[damage$PROPDMGEXP=="K"]*1000
+damage$PROPDMG[damage$PROPDMGEXP=="h"]<- damage$PROPDMG[damage$PROPDMGEXP=="h"]*100
+damage$PROPDMG[damage$PROPDMGEXP=="H"]<- damage$PROPDMG[damage$PROPDMGEXP=="H"]*100
+
+```
+
+## Results
+There are two questions we are trying to answer: 
+
+* Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+* Across the United States, which types of events have the greatest economic consequences?
+
+### Population Health Effects
+Population health effects includes both injuries and deaths.  The following chart indicates the total number of each for the 
+various event types.  Tornados cause both the most injuries and the most death.  Heat, Flooding, and High Winds all stand
+out as significant causes of injuries.
+
+```{r popdmg }
+popdmg <- damage %>% filter(FATALITIES != 0 | INJURIES != 0) %>% gather(type, count, FATALITIES:INJURIES) %>%
+  group_by(EVTYPE, type) %>% summarize (total = sum(count))
+ggplot(data=popdmg, aes(x=EVTYPE, y=total, fill=type)) + geom_bar(stat="identity") + coord_flip() +
+  xlab("Event Type") +
+  ylab("Total Injuries/Deaths") +
+  ggtitle("Population Harm From Weather Events")
+```
+
+### Economic Consequences
+Economic costs are expressed in terms of both crop damage and property damage.  The following chart indicates the total 
+number of each for the various event types.  Flooding causes the most overall damage as well as the most property damage.
+Drought causes the most crop damage.  Hurricanes, tornados, and storm surges also stand out as having high overall 
+economic consequences.
+``` {r econdmg, fig.height =6}
+econdmg <- damage %>% filter(CROPDMG != 0 | PROPDMG != 0) 
+econdmg <- gather(econdmg, type, count, c(CROPDMG, PROPDMG)) %>% group_by(EVTYPE, type) %>% summarize (total = sum(count))
+
+ggplot(data=econdmg, aes(x=EVTYPE, y=total, fill=type)) + geom_bar(stat="identity") + coord_flip() +
+  xlab("Event Type") +
+  ylab("Total Cost") +
+  ggtitle("Economic Damage From Weather Events")
+```
+

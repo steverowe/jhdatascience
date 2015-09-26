@@ -1,0 +1,98 @@
+---
+title: "Exponential Distribution"
+author: "Steve Rowe"
+date: "July 24, 2015"
+output: pdf_document
+---
+
+##Overview: 
+This project investigates the relationship between sample means and population (or theoretical) means for the exponential distribution.  The Central Limit Theorem tells us that the mean of a sufficient number of samples should approach the population mean.
+
+We will be investigating the exponential distribution which is defined as:
+
+$f(x,\lambda) = \lambda\epsilon^{-\lambda x}$ for positive values of x.
+
+The mean ($\mu$) is $1/\lambda$ and the standard deviation ($\sigma$) is also $1/\lambda$.
+
+We will focus on the case where $\lambda=0.2$, $\mu=5$, and $\sigma=5$. 
+
+##Simulations: 
+To conduct this exploration, we will look at two distributions.  The first is a distribution of 40 values drawn from the exponential distribution.  The second is a distribution of the means of 40 sample exponential groups.
+
+With only 40 data points, it may or may not approximate the true exponential very well.  For instance, this code:
+
+```{r echo=FALSE}
+library(ggplot2)
+lambda = 0.2
+nosim = 1000
+set.seed(727)
+```
+```{r results="hide"}
+exp40 <- rexp(40, lambda)
+```
+
+generates a mean of `r mean(exp40)` and a sd of `r sd(exp40)`.  We can plot this with a histogram.
+
+``` {r echo=FALSE, fig.height=3}
+hist(exp40, main="Histogram of 40 Exponential Samples", xlab="values")
+```
+
+As you can see, the mean and standard deviation are not what is expected and there are outliers.  This is because we do not have sufficient data.  However, if we repeatedly take sames of this size and calculate the mean of those samples, the central limit theorem says that the mean of those samples will approach the theoretical mean.
+
+For this example, we will will create a distribution 1,000 means of 40 samples each.  We generate that with this code:
+
+```{r results="hide"}
+mydata = data.frame(means =1:nosim)
+for (i in 1:nosim) mydata$means[i]= mean(rexp(40, lambda))
+```
+
+This creates a data frame called mydata which contains 1,000 means of 40 samples taken from the exponential distribution.  We will call this our Sample Distribution and the true Exponential distribution the Theoretical Distribution.
+
+##Sample Mean versus Theoretical Mean: 
+First we will compare the mean of the sample distribution with the mean of the theoretical distribution.  If the central limit theory is correct, the two should be close.  We know that the theoretical distribution's mean is $1/\lambda=5$ when $\lambda=0.2$.  In this case, the sample distribution has a mean of `r mean(mydata$means)` which is very close to 5.  Below is a histogram of the sample distribution.  The theoretical mean is represented by the vertical red line.
+
+``` {r echo=F}
+ggplot(mydata, aes(x=means)) + 
+  geom_histogram(aes(y = ..density..), binwidth=.5, color="black", fill="white") + 
+  geom_vline(aes(xintercept=1/lambda), color="red", linetype="dashed", size=1) + 
+  ggtitle("Histogram of Sample Distribution Means")
+```
+
+##Sample Variance versus Theoretical Variance: 
+
+Next we will compare variances.  The variance of a distribution is $\sigma^2$.  That is 25 for the theoretical distribution.  The variance of our sample distribution is `r var(mydata$means)`.  This is not close.  Why not?  There are two reasons for this.  First, we are measuring sample means, not raw samples.  These will be less variable than the underlying samples.  Second, as the number of sample means increases, the variance will decrease.  The variability get smaller.  With 1,000 samples, the variance will be very small.  For example, the variance of the original 40 samples from exponential have a variance of `r var(exp40)`.  This is much closer.
+
+```{r}
+var(mydata$means) # variance of 1000 means
+var(exp40) # variance of 40 individual samples
+```
+
+##Distribution: 
+Via figures and text, explain how one can tell the distribution is approximately normal.
+
+Finally we want to determine whether the sample distribution is normal.  Exponential itself is not (see appendix), but the Central Limit Theorem says that the distribution of repeated means of samples should be approximately normal.  Below is a graph of the histogram of the sample distribution overlayed with the graph of the normal distribution.
+
+``` {r echo=F}
+ggplot(mydata, aes(x=means)) + 
+  geom_histogram(aes(y = ..density..), binwidth=.5, color="black", fill="white") + 
+  stat_function(fun=dnorm, color="blue", args=list(mean=1/lambda, sd=sd(mydata$means))) + 
+  ggtitle("Comparison of Sample and Normal Distributions")
+```
+
+As you can see, the sample distribution closely approximates the normal distribution with the theoretical mean and the same standard deviation.
+
+##Appendix
+
+###Combined Code to generate the ggplots
+```{r, results="hide"}
+g <- ggplot(mydata, aes(x=means)) + 
+  geom_histogram(aes(y = ..density..), binwidth=.5, color="black", fill="white") + 
+  stat_function(fun=dnorm, color="blue", args=list(mean=1/lambda, sd=sd(mydata$means))) + 
+  geom_vline(aes(xintercept=1/lambda), color="red", linetype="dashed", size=1) + 
+  ggtitle("Sample vs Normal Distribution")
+```
+
+###Expontential Distribution
+``` {r}
+curve(dexp, 0, 3.5, lwd=2, main="Theoretical Exponential Distribution")
+```

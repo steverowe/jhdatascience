@@ -1,0 +1,77 @@
+---
+title: "Effect of Vitamin C on Tooth Growth"
+author: "Steve Rowe"
+date: "July 25, 2015"
+output: pdf_document
+---
+
+``` {r echo=F, message=F}
+library(datasets)
+data("ToothGrowth")
+library(dplyr)
+library(ggplot2)
+
+```
+##Overview
+We will be exploring the effect of Vitamin C on the growth of teeth in guinea pigs using the ToothGrowth dataset that comes with R.  This dataset examines the response in length of teeth in each of 10 guinea pigs.  Each is subjected to 3 dose levels of vitamin C and two delivery methods (orange juice and ascorbic acid).
+
+##Exploratory Data Analysis
+The details of the data source can be found in the appendix.  First we want to visualize the data to look for outliers or non-normal distributions.  
+```{r fig.height=3}
+ggplot(ToothGrowth, aes(len)) +  geom_histogram(binwidth=3, color="black", fill="white") +  
+  facet_grid(. ~ supp + dose) + ggtitle("Compmaring Vitamin C Treatments") +  xlab("Tooth Length")
+```
+There are no serious outliers and the data seems normal.  
+
+##Data Summary
+``` {r}
+ToothGrowth <- group_by(ToothGrowth, supp, dose)
+summarize(ToothGrowth, avglen = mean(len))
+```
+Larger doses appear to cause more growth.  Orange juice seems to work better than ascorbic acid for small doses and both appear to work similarly for large doses.  Can this be attributed to one being better than the other or is this just random chance?
+
+##Comparison of Growth
+We want to understand whether orange juice works better than ascorbic acid.  To compare the results we will use a t-test because the number of samples is small.  T-tests work on pairs of groups so we will conduct a t-test for each dose size.  If the p-value is <= 0.5, the result is considered statistically significant.  If it is larger, the results are too likely to occur by random chance.
+```{r}
+for(i in split(ToothGrowth, ToothGrowth$dose)) 
+{
+  tmp <- split(i, i$supp)
+  print(sprintf("dose: %1.1f", i[1,]$dose))
+  print(sprintf("p-value: %f", t.test(tmp[[1]]$len, tmp[[2]]$len)$p.value))
+}
+```
+At two of the 3 dose sizes, the Orange Juice is more effective and this result is significant.  At the highest dose (2 milligrams), Orange Juice is no more effective than Absorbic Acid.
+
+We also want to see whether the dose size differences are significant.  Again, we will use t-tests.  We will compare 0.5 vs 1 mg and 1 vs 2 mg.
+
+```{r}
+for(i in split(ToothGrowth, ToothGrowth$supp)) 
+{
+  tmp <- split(i, i$dose)
+  print(sprintf("Supplement: %s", i[1,]$supp))
+  print(sprintf("p-value: %f", t.test(tmp[[1]]$len, tmp[[2]]$len)$p.value))
+  print(sprintf("p-value: %f", t.test(tmp[[2]]$len, tmp[[3]]$len)$p.value))
+}
+```
+Each of the p-values is < .05 and is thus signficant.  The dosage appears to matter.
+
+##Conclusions
+The t-tests prove that orange juice is equally or more effective than abscorbic acid except at the 2mg dosage level where it is no better.  Dosage matters for each drug, with the higher levels causing greather tooth growth.
+
+In order for these effects to hold, it is assumed that the guinea pigs were randomly assigned to treatments.  If they were not, other variables such as a natural affinity to grow teeth faster may confound the results.  Assuming that they were, we can trust that the results show causality and not merely correlation.
+
+#Appendix
+
+##ToothGrowth DataSet
+The ToothGrowth dataset in R looks like the following:
+
+[,1]	 len	 numeric	 Tooth length
+
+[,2]	 supp	 factor	 Supplement type (VC or OJ).
+
+[,3]	 dose	 numeric	 Dose in milligrams.
+
+```{r}
+head(ToothGrowth)
+
+```

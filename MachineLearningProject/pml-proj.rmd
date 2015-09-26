@@ -1,0 +1,88 @@
+---
+title: "Practical Machine Learning Project"
+author: "Steve Rowe"
+date: "September 22, 2015"
+output: html_document
+---
+
+```{r init, echo=F, message=F}
+library(caret)
+library(dplyr)
+set.seed(91314)
+```
+#Summary
+In this analysis, we analyze fitness data from <http://groupware.les.inf.puc-rio.br/har>.  The experiment used accelerometers to collect data during various exercises.  Some were done correctly and others incorrectly.  The goal of this analysis is to determine whether we can detect correct from incorrect exercises utilizing only the accelerometer data.
+
+We compare two types of model and two variations of each.  We examine random forests and boosted models, training them with a holdout test set and cross-validation.  Random forests turn out to work better and the cross-validated version even better than the test holdout version.  That model predicts 99.98% or higher accuracy.
+
+#Details
+
+##Loading the Data
+We load the dataset and separate it into an 80% training set and a 20% test set.  We limit ourselves to only the acceleration readings, not any of the aggregate statistics.
+```{r load, cache=T}
+pml.training <- read.csv("data/pml-training.csv", stringsAsFactors = F)
+
+inTrain <- createDataPartition(pml.training$X, p=0.8, list=F)
+pml.training <- mutate(pml.training, class = factor(classe)) %>% 
+  select(class, roll_belt:total_accel_belt, gyros_belt_x:total_accel_arm, gyros_arm_x:magnet_arm_z, 
+         roll_dumbbell:yaw_dumbbell, total_accel_dumbbell, gyros_dumbbell_x:yaw_forearm, 
+         total_accel_forearm, gyros_forearm_x:magnet_forearm_z)
+training <- pml.training[inTrain,]
+testing <- pml.training[-inTrain,]
+```
+
+## Building the models
+
+```{r, include=F}
+rf.mod <- readRDS(file="data/randomforest.rds")
+rf_cv.mod <- readRDS(file="data/rf_cv.rds")
+gbm.mod <- readRDS(file="data/gbm.rds")
+gbm_cv.mod <- readRDS(file="data/gbm_cv.rds")
+```
+
+### Random Forest
+```{r, eval=F}
+rf.mod <- train(class~., data=training, method="rf")
+```
+
+### Random Forest, Cross-Validated
+```{r, eval=F}
+train_control <- trainControl(method="cv", number=10, savePred=T)
+rf_cv.mod <- train(class~., data=pml.training, trControl=train_control, method="rf")
+```
+
+### Boosted Model
+```{r, eval=F}
+gbm.mod <- train(class~., data=training, method="gbm")
+```
+
+### Boosted Model, Cross-Validated
+```{r, eval=F}
+train_control <- trainControl(method="cv", number=10, savePred=T)
+gbm_cv.mod <- train(class~., data=pml.training, method="gbm", trControl=train_control)
+```
+
+## Comparing the Models
+```{r, message=F}
+rf.predictions <- predict(rf.mod, newdata=testing)
+rf.cm <- confusionMatrix(rf.predictions, testing$class)
+
+rf_cv.predictions <- predict(rf_cv.mod, newdata=pml.training)
+rf_cv.cm <- confusionMatrix(rf_cv.predictions, pml.training$class)
+
+gbm.predictions <- predict(gbm.mod, newdata=testing)
+gbm.cm <- confusionMatrix(gbm.predictions, testing$class)
+
+gbm_cv.predictions <- predict(gbm_cv.mod, newdata=pml.training)
+gbm_cv.cm <- confusionMatrix(gbm_cv.predictions, pml.training$class)
+
+```
+The out of sample error predictions are below.  The Random Forest, Cross-Validation model gets the highest expected error rate.
+```{r, echo=F, message=F}
+results <- c(rf=rf.cm$overall["Accuracy"], rf_cv=rf_cv.cm$overall["Accuracy"], gbm=gbm.cm$overall["Accuracy"], gbm_cv=gbm_cv.cm$overall["Accuracy"])
+results
+```
+Here is the full confusionMatrix for that model.  It tells us there is a 95% chance that we will be between 99.98% and 100% accurate.
+```{r, echo=F}
+rf_cv.cm
+```

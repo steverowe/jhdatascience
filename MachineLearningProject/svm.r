@@ -1,0 +1,1 @@
+#I finally compared (visually) a t-SNE plot (https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding ) with a Classifier Comparison chart (http://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html) to choose an SVM classifier with a RBF (Radial Basis Function) kernel.  
