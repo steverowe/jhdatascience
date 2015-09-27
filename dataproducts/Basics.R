@@ -10,3 +10,18 @@ cars <- filter(cars, mpg > 20 & mpg < 25)
 
 parcoord(cars,col=brewer.pal(12, "Paired"), var.label=T)
 
+library(shinyapps)
+shinyapps::deployApp()
+
+library(devtools)
+install_github('slidify', 'ramnathv')
+install_github('slidifyLibraries', 'ramnathv')
+library(slidify)
+author("mpgdeck")
+
+slidify("index.Rmd")
+
+browseURL("index.html") 
+
+publish(title = 'mpgdeck', 'mpgdeck/index.html', host = 'rpubs')
+publish(user = "steverowe", repo = "mpgparallel")
